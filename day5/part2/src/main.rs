@@ -36,12 +36,11 @@ fn main() {
     // apply the operations
     for operation in input.lines().skip(10) {
         let (cnt, from, to) = extract_op(operation);
-        let crates = &stack[from as usize - 1][stack.len() - cnt as usize..stack.len()];
-        stack[to as usize - 1].push(crates);
-        for _ in 0..cnt {
-            let val = stack[from as usize - 1].pop().unwrap();
-            stack[to as usize - 1].push(val);
-        }
+        let crates = &mut stack[from as usize - 1];
+        let data: Vec<String> = crates
+            .splice(crates.len() - cnt as usize..crates.len(), Vec::new())
+            .collect();
+        stack[to as usize - 1].append(&mut data.clone());
     }
 
     println!(
