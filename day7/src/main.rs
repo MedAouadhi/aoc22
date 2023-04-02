@@ -1,11 +1,10 @@
-use std::{fs, cell::RefCell};
+use std::{cell::RefCell, fs, rc::Rc};
 
-
-type INodePtr = RefCell<Box<INode>>;
+type INodePtr = Rc<RefCell<Box<INode>>>;
 
 #[derive(Clone, Debug)]
 enum Type {
-    File{size: usize},
+    File { size: usize },
     Folder,
 }
 
@@ -13,7 +12,7 @@ enum Type {
 struct INode {
     name: String,
     node_type: Type,
-    children: Vec<INodePtr>,
+    children: RefCell<Vec<INodePtr>>,
 }
 
 impl INode {
@@ -21,26 +20,54 @@ impl INode {
         Self {
             name: name.to_string(),
             node_type: n_type,
-            children: vec![],
+            children: RefCell::new(Vec::new()),
         }
     }
 
-    fn add_child(&mut self, node: &INodePtr) {
-        self.children.push(node.clone());
+    fn add_child(&mut self, node: INodePtr) {
+        self.children.borrow_mut().push(node)
     }
 
     fn get_size(&self) -> usize {
         if let Type::File { size } = self.node_type {
             size
-        } else if self.children.is_empty() {
+        } else if self.children.borrow_mut().is_empty() {
             0
         } else {
-            self.children.iter().map(|x| x.borrow().get_size()).sum::<usize>()
+            self.children
+                .borrow_mut()
+                .iter()
+                .map(|x| x.borrow().get_size())
+                .sum::<usize>()
         }
     }
 
-}
+    fn get_child(&self, name: &str) -> Option<INodePtr> {
+        self.children
+            .borrow()
+            .iter()
+            .find(|&x| x.borrow().name == name)
+            .cloned()
+    }
 
+    fn print_contents(&self, depth: usize) {
+        // print the current Node
+        let tabs = "\t".repeat(depth);
+        if let Type::File { size } = self.node_type {
+            println!("{}{} {}", tabs, size, self.name);
+        } else {
+            println!("{}{}", tabs, self.name);
+            return self
+                .children
+                .borrow_mut()
+                .iter()
+                .map(|x| x.borrow().print_contents(depth + 1))
+                .collect();
+        }
+    }
+    // fn from_path(&self, path: String) -> Option<&Self> {
+    // }
+}
 
 fn main() {
     println!("Hello, world!");
@@ -51,32 +78,65 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_new() {
-        let mut f1 = INode::new("/", Type::Folder);
-        let mut f2 = RefCell::new(Box::new(INode::new("game", Type::Folder)));
+    fn test_get_size() {
+        let mut root = INode::new("/", Type::Folder);
+        let mut game = Rc::new(RefCell::new(Box::new(INode::new("game", Type::Folder))));
+        let mut music = Rc::new(RefCell::new(Box::new(INode::new("music", Type::Folder))));
+        let csgo = Rc::new(RefCell::new(Box::new(INode::new(
+            "csgo",
+            Type::File { size: 1500 },
+        ))));
+        let cod = Rc::new(RefCell::new(Box::new(INode::new(
+            "cod",
+            Type::File { size: 2000 },
+        ))));
+        let yellow = Rc::new(RefCell::new(Box::new(INode::new(
+            "yellow",
+            Type::File { size: 300 },
+        ))));
 
-        f1.add_child(&mut f2);
+        root.add_child(game.clone());
+        root.add_child(music.clone());
 
-        assert!(f1.children.len() != 0);
+        game.borrow_mut().add_child(csgo.clone());
+        game.borrow_mut().add_child(cod.clone());
+        music.borrow_mut().add_child(yellow.clone());
+
+        root.print_contents(0);
+
+        assert!(root.get_size() == 3800);
+        assert!(game.borrow().get_size() == 3500);
+        assert!(csgo.borrow().get_size() == 1500);
+        assert!(music.borrow().get_size() == 300);
     }
 
     #[test]
-    fn test_get_size() {
+    fn test_get_child() {
         let mut root = INode::new("/", Type::Folder);
-        let mut game = RefCell::new(Box::new(INode::new("game", Type::Folder)));
-        let mut music = RefCell::new(Box::new(INode::new("music", Type::Folder)));
-        let csgo = RefCell::new(Box::new(INode::new("csgo", Type::File { size: 1500 })));
-        let yellow = RefCell::new(Box::new(INode::new("yellow", Type::File { size: 300 })));
+        let mut game = Rc::new(RefCell::new(Box::new(INode::new("game", Type::Folder))));
+        let mut music = Rc::new(RefCell::new(Box::new(INode::new("music", Type::Folder))));
+        let csgo = Rc::new(RefCell::new(Box::new(INode::new(
+            "csgo",
+            Type::File { size: 1500 },
+        ))));
+        let cod = Rc::new(RefCell::new(Box::new(INode::new(
+            "cod",
+            Type::File { size: 2000 },
+        ))));
+        let yellow = Rc::new(RefCell::new(Box::new(INode::new(
+            "yellow",
+            Type::File { size: 300 },
+        ))));
 
-        game.borrow_mut().add_child(&csgo);
-        music.borrow_mut().add_child(&yellow);
-        root.add_child(&mut game);
-        root.add_child(&mut music);
+        root.add_child(game.clone());
+        root.add_child(music.clone());
 
+        game.borrow_mut().add_child(csgo.clone());
+        game.borrow_mut().add_child(cod.clone());
+        music.borrow_mut().add_child(yellow.clone());
 
-        assert!(root.get_size() == 1800);
-        assert!(game.borrow().get_size() == 1500);
-        assert!(csgo.borrow().get_size() == 1500);
-        assert!(music.borrow().get_size() == 300);
+        let child = root.get_child("music");
+        println!("child = {:#?}", child);
+        assert!(child.is_some());
     }
 }
