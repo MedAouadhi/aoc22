@@ -159,10 +159,9 @@ fn main() {
         .borrow()
         .get_size(Some(sizes.clone()), target_size);
 
-    sizes.borrow_mut().sort();
     println!(
         "Size of the folder that needs to be deleted = {}",
-        sizes.borrow().first().unwrap()
+        sizes.borrow().iter().min().unwrap()
     );
 }
 
